@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mapa Endereço</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
+<style>
+html,body{margin:0;height:100%;font-family:Arial}
+#top{display:flex;gap:8px;padding:8px;background:#1f2937;color:#fff}
+#q{flex:1;padding:10px;border-radius:8px;border:none}
+button{padding:10px;border:none;border-radius:8px;cursor:pointer}
+#map{height:55vh}
+#info{padding:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+input{width:100%;padding:8px}
+@media(max-width:700px){#info{grid-template-columns:1fr}}
+</style></head><body>
+<div id="top">
+<input id="q" placeholder="Pesquisar endereço">
+<button onclick="searchAddr()">Buscar</button>
+<button onclick="gps()">📍GPS</button>
+</div>
+<div id="map"></div>
+<div id="info"></div>
+<div style="padding:10px;display:flex;gap:8px;flex-wrap:wrap">
+<button onclick="copyAddr()">📋 Copiar endereço</button>
+<button onclick="copyCoords()">📋 Coordenadas</button>
+<button onclick="openGoogle()">🧭 Google Maps</button>
+<button onclick="clearFields()">🗑 Limpar</button>
+</div>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+const fields=["Rua","Número","Bairro","Cidade","Estado","CEP","País","Latitude","Longitude"];
+const ids=["road","house_number","suburb","city","state","postcode","country","lat","lon"];
+const info=document.getElementById("info");
+ids.forEach((id,i)=>info.insertAdjacentHTML("beforeend",`<div><label>${fields[i]}</label><input id="${id}" readonly></div>`));
+const map=L.map('map').setView([-25.43,-49.27],13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'©OSM'}).addTo(map);
+let marker=L.marker(map.getCenter(),{draggable:true}).addTo(map);
+marker.on('dragend',()=>rev(marker.getLatLng()));
+map.on('click',e=>{marker.setLatLng(e.latlng);rev(e.latlng);});
+async function rev(ll){
+let u=`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${ll.lat}&lon=${ll.lng}`;
+let j=await fetch(u).then(r=>r.json());
+let a=j.address||{};
+road.value=a.road||"";house_number.value=a.house_number||"";suburb.value=a.suburb||a.neighbourhood||"";
+city.value=a.city||a.town||a.village||"";state.value=a.state||"";postcode.value=a.postcode||"";
+country.value=a.country||"";lat.value=ll.lat.toFixed(6);lon.value=ll.lng.toFixed(6);
+}
+async function searchAddr(){
+let t=q.value.trim(); if(!t)return;
+let j=await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(t)}`).then(r=>r.json());
+if(!j.length){alert("Não encontrado");return;}
+let ll={lat:+j[0].lat,lng:+j[0].lon}; map.setView(ll,18); marker.setLatLng(ll); rev(ll);
+}
+function gps(){navigator.geolocation.getCurrentPosition(p=>{let ll={lat:p.coords.latitude,lng:p.coords.longitude};map.setView(ll,18);marker.setLatLng(ll);rev(ll);},e=>alert(e.message),{enableHighAccuracy:true});}
+function copyAddr(){navigator.clipboard.writeText(`${road.value}, ${house_number.value} - ${suburb.value}, ${city.value} - ${state.value}, ${postcode.value}, ${country.value}`);}
+function copyCoords(){navigator.clipboard.writeText(`${lat.value}, ${lon.value}`);}
+function openGoogle(){window.open(`https://www.google.com/maps?q=${lat.value},${lon.value}`);}
+function clearFields(){ids.forEach(i=>document.getElementById(i).value="");q.value="";}
+rev(map.getCenter());
+</script></body></html>
